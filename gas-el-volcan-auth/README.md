@@ -1,0 +1,91 @@
+# Gas El Volcán — Microservicio de autenticación (EA3)
+
+Emite el JWT que usa todo el sistema. Es el **único** servicio que crea usuarios y firma tokens. `gas-el-volcan-pedidos` (la carpeta raíz de este repositorio) solo los **valida**, con la misma clave y el mismo emisor. Los dos servicios no comparten tablas ni clases.
+
+```text
+React (5173) ──login/registro──▶ Auth (8081) ── MySQL gas_volcan_auth
+     │                              │ firma JWT (JWT_SECRET)
+     └──Authorization: Bearer──▶ Pedidos (8082) ── MySQL gas_volcan_pedidos
+                                    valida firma, emisor, vencimiento y rol
+```
+
+## Estructura
+
+```text
+gas-el-volcan-auth/
+├── pom.xml
+├── .env.example                 # copiar como .env (no se sube a Git)
+└── src/
+    ├── main/java/gaselvolcan/auth/
+    │   ├── AuthApplication.java
+    │   ├── config/              # SecurityConfig (BCrypt, CORS, reglas), Swagger, usuarios iniciales
+    │   ├── controller/          # AuthController: /api/v1/auth/...
+    │   ├── dto/                 # LoginRequest, RegistroRequest, SesionResponse
+    │   ├── exception/           # ApiError (mismo formato que Pedidos) y manejador global
+    │   ├── model/               # Usuario, Rol
+    │   ├── repository/          # UsuarioRepository
+    │   ├── security/            # JwtService (firma/valida), JwtAuthenticationFilter
+    │   └── service/             # AuthService: login, registro, sesión actual
+    └── test/java/gaselvolcan/auth/
+        ├── security/JwtServiceTest.java
+        └── service/AuthServiceTest.java
+```
+
+## Cómo ejecutarlo
+
+1. MySQL: desde la carpeta raíz del repositorio, `docker compose up -d` (el mismo contenedor que usa Pedidos).
+2. En esta carpeta, copiar `.env.example` como `.env` y completar:
+   - `DB_PASSWORD`: la clave de root del `docker-compose.yml`.
+   - `JWT_SECRET`: el **mismo** Base64 que tiene configurado Pedidos.
+   - `SEED_*_PASSWORD`: las contraseñas de los tres usuarios de prueba.
+3. Ejecutar `AuthApplication.java` desde el IDE (con esta carpeta como directorio de trabajo) o `mvnw.cmd spring-boot:run`.
+4. Abrir `http://localhost:8081/swagger-ui.html`.
+
+Spring Boot lee el `.env` solo (`spring.config.import` en `application.properties`). Si el archivo no existe, se usan las variables de entorno del sistema o de la configuración de ejecución del IDE. La base `gas_volcan_auth` se crea sola la primera vez.
+
+Pruebas: `mvnw.cmd test` (12 pruebas de JwtService y AuthService, sin necesidad de MySQL).
+
+## Endpoints
+
+| Método | Ruta | Acceso | Recibe | Responde |
+|---|---|---|---|---|
+| POST | `/api/v1/auth/login` | Público | `{ "correo", "password" }` | 200 `{ token, correo, rol, nombre }` · 400 formato · 401 credenciales |
+| POST | `/api/v1/auth/registro` | Público | `{ "nombre", "correo", "password", "telefono" }` | 201 igual que login, rol `CLIENTE` · 400 · 409 correo repetido |
+| GET | `/api/v1/auth/me` | Con token | `Authorization: Bearer <token>` | 200 `{ correo, rol, nombre }` · 401 sin token, vencido, alterado o usuario desactivado |
+
+Cualquier otra ruta responde 401 (sin token) o 403 (con token). Los errores usan el mismo JSON que Pedidos:
+
+```json
+{ "timestamp": "...", "status": 401, "error": "Unauthorized",
+  "mensaje": "Correo o contrasena incorrectos", "ruta": "/api/v1/auth/login", "detalles": {} }
+```
+
+## Contrato del JWT (lo que valida Pedidos)
+
+| Campo | Valor |
+|---|---|
+| Algoritmo | HS256, clave `JWT_SECRET` (Base64, 32 bytes o más) |
+| `iss` | `gas-el-volcan-auth` (`JWT_ISSUER`) |
+| `sub` | correo del usuario, en minúsculas |
+| `rol` | `ADMIN`, `VENDEDOR` o `CLIENTE` |
+| `nombre` | nombre para mostrar |
+| `exp` | emisión + `JWT_EXPIRATION_MS` (1 hora por defecto) |
+
+## Seguridad
+
+- Las contraseñas se guardan solo como hash BCrypt (`$2a$10$...`).
+- El registro público **siempre** crea un `CLIENTE`. El rol no se acepta desde el navegador.
+- El login responde el mismo mensaje si el correo no existe o si la clave es incorrecta, así no revela qué correos están registrados.
+- Un usuario desactivado no puede iniciar sesión, y `/me` rechaza su token aunque todavía no haya vencido.
+- Sin sesión de servidor (`STATELESS`). CORS abierto solo hacia `FRONTEND_URL`.
+- Ni la clave JWT, ni las contraseñas de prueba, ni la clave de MySQL están en el código: vienen del `.env`.
+
+## Usuarios de prueba
+
+Se crean al arrancar si su correo no existe y si su variable `SEED_*_PASSWORD` tiene valor.
+
+| Correo | Rol |
+|---|---|
+| `admin@volcan.cl` | ADMIN |
+| `vendedor@volcan.cl` | VENDEDOR |
+| `cliente@volcan.cl` | CLIENTE |

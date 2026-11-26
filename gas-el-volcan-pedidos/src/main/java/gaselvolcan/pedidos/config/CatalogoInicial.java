@@ -9,7 +9,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 import java.io.InputStream;
 import java.math.BigDecimal;
-import java.util.*;
 
 @Component
 public class CatalogoInicial implements CommandLineRunner {

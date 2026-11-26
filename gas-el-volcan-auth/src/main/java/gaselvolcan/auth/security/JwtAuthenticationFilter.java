@@ -33,6 +33,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 Claims claims = jwt.validar(header.substring(7));
                 var auth = new UsernamePasswordAuthenticationToken(claims.getSubject(), null,
                     List.of(new SimpleGrantedAuthority("ROLE_" + claims.get("rol", String.class))));
+                auth.setDetails(claims); // /refresh necesita los claims del token actual
                 SecurityContextHolder.getContext().setAuthentication(auth);
             } catch (JwtException | IllegalArgumentException ex) {
                 SecurityContextHolder.clearContext();

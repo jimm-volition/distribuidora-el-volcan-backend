@@ -43,7 +43,7 @@ gas-el-volcan-auth/
 
 Spring Boot lee el `.env` solo (`spring.config.import` en `application.properties`). Si el archivo no existe, se usan las variables de entorno del sistema o de la configuración de ejecución del IDE. La base `gas_volcan_auth` se crea sola la primera vez.
 
-Pruebas: `mvnw.cmd test` (12 pruebas de JwtService y AuthService, sin necesidad de MySQL).
+Pruebas: `mvnw.cmd test` (18 pruebas de JwtService y AuthService, sin necesidad de MySQL).
 
 ## Endpoints
 
@@ -52,6 +52,15 @@ Pruebas: `mvnw.cmd test` (12 pruebas de JwtService y AuthService, sin necesidad 
 | POST | `/api/v1/auth/login` | Público | `{ "correo", "password" }` | 200 `{ token, correo, rol, nombre }` · 400 formato · 401 credenciales |
 | POST | `/api/v1/auth/registro` | Público | `{ "nombre", "correo", "password", "telefono" }` | 201 igual que login, rol `CLIENTE` · 400 · 409 correo repetido |
 | GET | `/api/v1/auth/me` | Con token | `Authorization: Bearer <token>` | 200 `{ correo, rol, nombre }` · 401 sin token, vencido, alterado o usuario desactivado |
+| POST | `/api/v1/auth/refresh` | Con token vigente | `Authorization: Bearer <token>` | 200 igual que login, con un token nuevo · 401 vencido, alterado, usuario desactivado o sesión sobre 8 horas |
+
+### Renovación del token
+
+React llama a `/refresh` 5 minutos antes de que venza el token, así la sesión no se corta mientras el usuario trabaja:
+
+- Solo se renueva un token **todavía vigente**. Uno vencido o alterado no sirve para pedir otro.
+- Se vuelve a leer el usuario en la base: si lo desactivaron no se renueva, y si le cambiaron el rol, el token nuevo trae el rol actual.
+- El token lleva el claim `sesionHasta` (8 horas desde el login, `JWT_MAX_SESSION_MS`). Al renovar se conserva, y ningún token vence después de ese límite. Pasadas las 8 horas hay que volver a ingresar.
 
 Cualquier otra ruta responde 401 (sin token) o 403 (con token). Los errores usan el mismo JSON que Pedidos:
 
@@ -69,7 +78,8 @@ Cualquier otra ruta responde 401 (sin token) o 403 (con token). Los errores usan
 | `sub` | correo del usuario, en minúsculas |
 | `rol` | `ADMIN`, `VENDEDOR` o `CLIENTE` |
 | `nombre` | nombre para mostrar |
-| `exp` | emisión + `JWT_EXPIRATION_MS` (1 hora por defecto) |
+| `exp` | emisión + `JWT_EXPIRATION_MS` (1 hora por defecto), sin pasar de `sesionHasta` |
+| `sesionHasta` | límite para renovar: login + `JWT_MAX_SESSION_MS` (8 horas). Pedidos lo ignora |
 
 ## Seguridad
 

@@ -1,0 +1,15 @@
+[Unit]
+Description=Gas El Volcan - Pedidos API (127.0.0.1:8082)
+After=network.target mysql.service
+Wants=mysql.service
+
+[Service]
+User=ubuntu
+WorkingDirectory=/opt/gas-volcan/pedidos
+EnvironmentFile=/etc/gas-volcan/pedidos.env
+ExecStart=/usr/bin/java -Xms128m -Xmx512m -jar /opt/gas-volcan/pedidos/app.jar
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

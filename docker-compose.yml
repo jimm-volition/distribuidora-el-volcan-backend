@@ -1,0 +1,21 @@
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: gas-volcan-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root_local_solo_desarrollo
+      MYSQL_DATABASE: gas_volcan_pedidos
+      MYSQL_USER: gasvolcan
+      MYSQL_PASSWORD: gasvolcan_local
+    ports:
+      - "3306:3306"
+    volumes:
+      - gas_volcan_db:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -p$$MYSQL_ROOT_PASSWORD"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+volumes:
+  gas_volcan_db:

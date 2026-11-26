@@ -1,6 +1,6 @@
 # Gas El Volcán — Microservicio de autenticación (EA3)
 
-Emite el JWT que usa todo el sistema. Es el **único** servicio que crea usuarios y firma tokens. `gas-el-volcan-pedidos` (la carpeta raíz de este repositorio) solo los **valida**, con la misma clave y el mismo emisor. Los dos servicios no comparten tablas ni clases.
+Emite el JWT que usa todo el sistema. Es el **único** servicio que crea usuarios y firma tokens. `gas-el-volcan-pedidos` (la carpeta vecina en este repositorio) solo los **valida**, con la misma clave y el mismo emisor. Los dos servicios no comparten tablas ni clases.
 
 ```text
 React (5173) ──login/registro──▶ Auth (8081) ── MySQL gas_volcan_auth
@@ -10,6 +10,12 @@ React (5173) ──login/registro──▶ Auth (8081) ── MySQL gas_volcan_a
 ```
 
 ## Estructura
+
+```text
+distribuidora-el-volcan-backend/     # este repositorio
+├── gas-el-volcan-auth/              # este microservicio (puerto 8081)
+└── gas-el-volcan-pedidos/           # catalogo y boletas (puerto 8082), trae el docker-compose.yml de MySQL
+```
 
 ```text
 gas-el-volcan-auth/
@@ -33,9 +39,9 @@ gas-el-volcan-auth/
 
 ## Cómo ejecutarlo
 
-1. MySQL: desde la carpeta raíz del repositorio, `docker compose up -d` (el mismo contenedor que usa Pedidos).
-2. En esta carpeta, copiar `.env.example` como `.env` y completar:
-   - `DB_PASSWORD`: la clave de root del `docker-compose.yml`.
+1. MySQL: desde la carpeta `gas-el-volcan-pedidos/`, `docker compose up -d`. Es el mismo contenedor para los dos servicios: cada uno usa su propia base (`gas_volcan_auth` y `gas_volcan_pedidos`).
+2. En esta carpeta (`gas-el-volcan-auth/`), copiar `.env.example` como `.env` y completar:
+   - `DB_PASSWORD`: la clave de root (`MYSQL_ROOT_PASSWORD` del `docker-compose.yml` de Pedidos).
    - `JWT_SECRET`: el **mismo** Base64 que tiene configurado Pedidos.
    - `SEED_*_PASSWORD`: las contraseñas de los tres usuarios de prueba.
 3. Ejecutar `AuthApplication.java` desde el IDE (con esta carpeta como directorio de trabajo) o `mvnw.cmd spring-boot:run`.

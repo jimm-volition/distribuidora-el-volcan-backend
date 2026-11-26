@@ -1,0 +1,15 @@
+[Unit]
+Description=Gas El Volcan - Auth API (127.0.0.1:8081)
+After=network.target mysql.service
+Wants=mysql.service
+
+[Service]
+User=ubuntu
+WorkingDirectory=/opt/gas-volcan/auth
+EnvironmentFile=/etc/gas-volcan/auth.env
+ExecStart=/usr/bin/java -Xms128m -Xmx512m -jar /opt/gas-volcan/auth/app.jar
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

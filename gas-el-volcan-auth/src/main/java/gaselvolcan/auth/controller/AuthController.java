@@ -4,6 +4,7 @@ import gaselvolcan.auth.dto.LoginRequest;
 import gaselvolcan.auth.dto.RegistroRequest;
 import gaselvolcan.auth.dto.SesionResponse;
 import gaselvolcan.auth.service.AuthService;
+import io.jsonwebtoken.Claims;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -50,5 +51,17 @@ public class AuthController {
     @ApiResponse(responseCode = "401", description = "Sin token, token vencido o alterado, o usuario desactivado")
     public SesionResponse me(Authentication usuario) {
         return servicio.sesionActual(usuario.getName());
+    }
+
+    @PostMapping("/refresh")
+    @SecurityRequirement(name = "bearerAuth")
+    @Operation(summary = "Renovar token",
+        description = "Recibe un token todavia vigente y devuelve uno nuevo con otra hora de vencimiento. "
+            + "React lo llama solo unos minutos antes de que venza. La sesion completa no puede durar mas de 8 horas "
+            + "desde el login: despues de eso hay que volver a ingresar.")
+    @ApiResponse(responseCode = "200", description = "Token nuevo")
+    @ApiResponse(responseCode = "401", description = "Token vencido o alterado, usuario desactivado o sesion sobre su duracion maxima")
+    public SesionResponse refresh(Authentication usuario) {
+        return servicio.renovar(usuario.getName(), (Claims) usuario.getDetails());
     }
 }

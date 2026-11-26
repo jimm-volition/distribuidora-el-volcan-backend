@@ -7,6 +7,8 @@ import gaselvolcan.auth.model.Rol;
 import gaselvolcan.auth.model.Usuario;
 import gaselvolcan.auth.repository.UsuarioRepository;
 import gaselvolcan.auth.security.JwtService;
+import io.jsonwebtoken.Claims;
+import java.util.Date;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -92,6 +94,46 @@ class AuthServiceTest {
         assertThrows(CorreoDuplicadoException.class, () ->
             servicio.registrarCliente(new RegistroRequest("Ana", "cliente@volcan.cl", "Clave12345", null)));
         verify(usuarios, never()).saveAndFlush(any());
+    }
+
+    @Test void renovarEntregaTokenNuevoConElMismoLimiteDeSesion() {
+        Usuario u = guardado("x", true);
+        Claims claims = mock(Claims.class);
+        Date limite = new Date(System.currentTimeMillis() + 3_600_000);
+        when(usuarios.findByCorreoIgnoreCase("cliente@volcan.cl")).thenReturn(Optional.of(u));
+        when(jwt.sesionHasta(claims)).thenReturn(limite);
+        when(jwt.generar(u, limite)).thenReturn("token-renovado");
+
+        var sesion = servicio.renovar("cliente@volcan.cl", claims);
+
+        assertEquals("token-renovado", sesion.token());
+        assertEquals(Rol.CLIENTE, sesion.rol());
+    }
+
+    @Test void renovarTraeElRolActualDeLaBase() {
+        Usuario u = guardado("x", true);
+        u.setRol(Rol.VENDEDOR); // le cambiaron el rol despues de su login
+        Claims claims = mock(Claims.class);
+        when(usuarios.findByCorreoIgnoreCase("cliente@volcan.cl")).thenReturn(Optional.of(u));
+        when(jwt.sesionHasta(claims)).thenReturn(new Date(System.currentTimeMillis() + 60_000));
+        when(jwt.generar(any(), any())).thenReturn("t");
+
+        assertEquals(Rol.VENDEDOR, servicio.renovar("cliente@volcan.cl", claims).rol());
+    }
+
+    @Test void noRenuevaSiLaSesionLlegoASuDuracionMaxima() {
+        Claims claims = mock(Claims.class);
+        when(usuarios.findByCorreoIgnoreCase("cliente@volcan.cl")).thenReturn(Optional.of(guardado("x", true)));
+        when(jwt.sesionHasta(claims)).thenReturn(new Date(System.currentTimeMillis() - 1_000));
+
+        assertThrows(CredencialesInvalidasException.class, () -> servicio.renovar("cliente@volcan.cl", claims));
+        verify(jwt, never()).generar(any(), any());
+    }
+
+    @Test void noRenuevaAUnUsuarioDesactivado() {
+        when(usuarios.findByCorreoIgnoreCase("cliente@volcan.cl")).thenReturn(Optional.of(guardado("x", false)));
+        assertThrows(CredencialesInvalidasException.class,
+            () -> servicio.renovar("cliente@volcan.cl", mock(Claims.class)));
     }
 
     @Test void sesionActualFallaSiElUsuarioFueDesactivado() {

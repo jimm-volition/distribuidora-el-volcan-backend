@@ -8,6 +8,8 @@ import gaselvolcan.auth.model.Rol;
 import gaselvolcan.auth.model.Usuario;
 import gaselvolcan.auth.repository.UsuarioRepository;
 import gaselvolcan.auth.security.JwtService;
+import io.jsonwebtoken.Claims;
+import java.util.Date;
 import java.util.Locale;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -61,6 +63,23 @@ public class AuthService {
             .filter(Usuario::isActivo)
             .orElseThrow(() -> new CredencialesInvalidasException("La sesion ya no es valida"));
         return new SesionResponse(null, u.getCorreo(), u.getRol(), u.getNombre());
+    }
+
+    /**
+     * Renueva un token que todavia es valido (el filtro ya verifico firma, emisor y vencimiento).
+     * Vuelve a leer al usuario: si lo desactivaron no renueva, y si le cambiaron el rol
+     * el token nuevo trae el rol actualizado. Conserva el limite de la sesion original.
+     */
+    @Transactional(readOnly = true)
+    public SesionResponse renovar(String correo, Claims actuales) {
+        Usuario u = usuarios.findByCorreoIgnoreCase(correo)
+            .filter(Usuario::isActivo)
+            .orElseThrow(() -> new CredencialesInvalidasException("La sesion ya no es valida"));
+        Date sesionHasta = jwt.sesionHasta(actuales);
+        if (!sesionHasta.after(new Date())) {
+            throw new CredencialesInvalidasException("La sesion alcanzo su duracion maxima. Vuelve a ingresar");
+        }
+        return new SesionResponse(jwt.generar(u, sesionHasta), u.getCorreo(), u.getRol(), u.getNombre());
     }
 
     private SesionResponse conToken(Usuario u) {

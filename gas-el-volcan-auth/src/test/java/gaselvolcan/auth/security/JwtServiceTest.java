@@ -51,6 +51,21 @@ class JwtServiceTest {
         assertThrows(JwtException.class, () -> jwt.validar(otro.generar(usuario())));
     }
 
+    @Test void elTokenLlevaElLimiteDeLaSesion() {
+        var claims = jwt.validar(jwt.generar(usuario()));
+        Date limite = jwt.sesionHasta(claims);
+        long ochoHoras = 8 * 60 * 60 * 1000L;
+        assertTrue(Math.abs(limite.getTime() - (System.currentTimeMillis() + ochoHoras)) < 5_000);
+    }
+
+    @Test void alRenovarSeConservaElLimiteYElTokenNoLoSupera() {
+        Date limite = new Date(System.currentTimeMillis() + 20_000); // quedan 20 s de sesion
+        var claims = jwt.validar(jwt.generar(usuario(), limite));
+        assertEquals(limite.getTime() / 1000, jwt.sesionHasta(claims).getTime() / 1000);
+        // El token dura 60 s, pero no puede vencer despues del limite de la sesion.
+        assertTrue(claims.getExpiration().getTime() <= limite.getTime());
+    }
+
     @Test void exigeUnSecretoDeAlMenos32Bytes() {
         String corto = Base64.getEncoder().encodeToString("corto".getBytes(StandardCharsets.UTF_8));
         assertThrows(IllegalStateException.class, () -> new JwtService(corto, "gas-el-volcan-auth", 60_000));
